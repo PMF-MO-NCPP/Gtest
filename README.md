@@ -221,7 +221,7 @@ testing::AssertionResult isCoprime1(long a, long b) {
 }
 
 TEST(predTest, advanced){
-    EXPECT_PRED2(isCoprime1, 3, 5) << " o.k." << 3 << " i " << 5 << " su relativno prosti";
+    EXPECT_PRED2(isCoprime1, 3, 5);
     long a = 6, b = 12;
     EXPECT_PRED2(isCoprime1, a, b) << a << " i " << b << " nisu relativno prosti"; 
 }

@@ -2,7 +2,8 @@
 #include <stdexcept>
 #include <cstring>
 
-// Najveći zajednički djelitelj, Euklidova metoda.
+// Najveći zajednički djelitelj, Euklidova metoda. Radi s pozitivnim 
+// i negativnim brojevima.
 long gcd(long a, long b) 
 {
     if (a<0) a = -a;
