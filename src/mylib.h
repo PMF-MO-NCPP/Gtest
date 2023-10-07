@@ -6,8 +6,11 @@
 #include <array>
 #include <fmt/format.h>
 
+// Najveći zajednički djelitelj dva broja.
 long gcd(long,long);
 
+// Uzima C-string i kopira ga u novi C-string s uklonjenim prednjim i stražnjim 
+// bjelinama.
 char * strip(const char * str);
 
 // Predložak metode za računanje drugog korijena broja. Izbacuje  std::runtime_error
