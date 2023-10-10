@@ -238,3 +238,285 @@ isCoprime1(a, b) evaluates to false, where
 ```
 
 
+Poruka koju šaljemo u `AssertionResult` tok javlja se samo ako uvjet nije zadovoljen.
+
+## Test Fixtures 
+
+Testovi često trebaju određenu inicijalizaciju prije svog izvršavanja te destrukciju/dealokaciju 
+objekata koji su pri tome konstruirani/alocirani, nakon što završe. Ukoliko se ista alokacija/dealokacija
+ponavlja u više testova možemo tu funkcionalnost zatvoriti u jednu klasu koja se naziva _test fixture_.
+
+Ta klasa treba imati sljedeći oblik (ime klase je proizvoljno):
+
+
+```c++
+class myTestFixture1: public ::testing::Test { 
+protected: 
+   myTestFixture1( ) { 
+       // Konstruktor.
+   } 
+   void SetUp( ) { 
+       // Ovaj kod će se izvršiti prije testova.
+   }
+   void TearDown( ) { 
+       // Kod koji se izvršava nakon testova. Dozvoljava izuzetke.
+   }
+   ~myTestFixture1( )  { 
+       // Destruktor. Izuzeci vode na nedefinirano ponašanje.   
+   }
+   // Potrebne varijable i metode.
+};
+```
+
+
+- Klasa nasljeđuje klasu `testing::Test` i cijelo tijelo klase je u `protected` sekciji. 
+- Klasa treba imati dodijeljeni konstruktir ili `SetUp()` metodu te destruktor ili `TearDown()` metodu. 
+- Izbor konstruktor/`SetUp()`, destruktor/`TearDown()` je stvar slobodnog odabira - `TearDown()` za razliku od 
+  destruktora dozvoljava izuzetke.
+- Unutar klase dolaze varijable i metode koje želimo koristiti u različitim testovima. 
+
+IMPORTANT: Novi _fixture_ objekt se konstruira u svakom novom testu. Na taj način testovi ostaju 
+nezavisni premda koriste istu _fixture_ klasu.
+
+Testovi koji koriste _fixture_ klase moraju koristiti makro `TEST_F()` umjesto makroa `TEST()`
+i prvi argument  `TEST_F()` makroa mora biti ime _fixture_ klase.
+
+```c++
+TEST_F(myTestFixture1, Test1){
+   // ovdje dolaze testovi. Konstrukcija i destrukcija 
+   // myTestFixture1 objekta je automatska
+}
+```
+
+
+### Kod za testiranje
+
+Testirat ćemo  klasu `Vector` koja predstavlja (ne baš standardan) vektor (vidjeti datoteku `src/mylib.h`). 
+Za testiranje parametriziranog konstruktora kopije zgodno je imati već 
+konstruirane vektore i stoga koristimo _test fixture_ klasu.
+
+
+###  Test Fixtures i testovi           
+
+Pripadna _test fixture_ klasa definira i inicijalizira dva vektora različite 
+duljine koje možemo koristiti u testovima.
+
+```c++
+class VectorTest : public ::testing::Test{ // Fixture
+protected:
+    Vector<int, 3> vi3;
+    Vector<double, 4> vd4;
+    VectorTest(){
+       vi3[0] = 0; vi3[1]=1; vi3[2] = 2; 
+       vd4[0] = 0.0; vd4[1] = 1.0; vd4[2] = 2.0; vd4[3] = 3.0;
+    }
+};
+```
+
+U testovima provjeravamo konstrukciju kopiranjem pomoću duljeg i kraćeg vektora.
+
+```c++
+TEST_F(VectorTest, ConstructFromSmaller){
+    Vector<double, 5> v(vd4);
+    EXPECT_DOUBLE_EQ(v[0], vd4[0]);
+    EXPECT_DOUBLE_EQ(v[3], 3.0);
+    EXPECT_DOUBLE_EQ(v[4], 0.0);
+}
+TEST_F(VectorTest, ConstructFromGreater){
+    Vector<double, 2> v(vi3);
+    EXPECT_DOUBLE_EQ(v[0], vi3[0]);
+    EXPECT_DOUBLE_EQ(v[1], vi3[1]);
+}
+```
+
+## Parametrizirani testovi
+
+Dvije su vrste parametriziranih testova, ovisno o tome čime su parametrizirani.
+Parametri mogu biti *vrijednosti* ili *tipovi*.
+
+Kada su parametri vrijednosti, onda isti kod možemo testirati s različitim 
+vrijednostima parametara bez ponavljanja testova.
+U slučaju parametara koji su tipovi, predloške klasa i funkcija možemo testirati 
+s različitim parametrima predloška bez ponavljanja testova.
+
+
+### Vrijednosti kao parametri
+
+Potrebno je napraviti _test fixture_ klasu, no sada ju izvodimo iz `testing::TestWithParam<T>` klase 
+u kojoj je `T` tip parametra koji variramo:
+
+
+```c++
+class MyTest : public testing::TestWithParam<T> {
+  // Uobičajena fixture klasa. Test parametar dohvaćamo pomoću 
+  // GetParam() metode iz bazne klase.
+};
+```
+
+Za testove koristimo makro `TEST_P()` čiji je prvi parametar ime _test fixture_ klase:
+
+```c++
+TEST_P(MyTest, ImeTesta) {
+  //...
+}
+```
+
+Unutar testova parametar za koji se vrši test dobivamo pomoću *GetParam()* funkcije. 
+
+Zadnji korak je selekcija parametara koja se radi pomoću makro 
+[INSTANTIATE_TEST_SUITE_P](https://google.github.io/googletest/reference/testing.html#INSTANTIATE_TEST_SUITE_P),
+koji ima signaturu:
+
+```
+INSTANTIATE_TEST_SUITE_P(InstantiationName,TestSuiteName,param_generator)
+```
+
+Ovdje je `InstantiationName` ime koje se koristi za ovaj niz testova da se razlikuje od drugih nizova testova.
+`TestSuiteName` je ime _fixture_ klase, a `param_generator` je generator vrijednosti.
+
+
+
+|  Generator vrijednosti |	Ponašanje |
+| -----------------------| ---------  |
+| `Range(begin, end [, step])`  | Daje poluotvoreni interval `{begin, begin+step, begin+step+step, ...}`                                   (`step=1` ako nije zadan). |
+| `Values(v1, v2, ..., vN)` |	Daje vrijednosti `{v1, v2, ..., vN}`.|
+| `ValuesIn(container)` |	Daje vrijednosti C-niza ili STL spremnika `container`.|
+| `ValuesIn(begin,end)` |	Daje vrijednosti iz raspona `[begin, end)`.|
+| `Bool()` |	Daje niz `{false, true}`.|
+| `Combine(g1, g2, ..., gN)` |	Daje Kartezijev produkt vrijednosti koje daju generatori `g1, g2, ... , gN`.|
+
+
+### Primjer
+
+Testiramo funkciju `strip()` s nizom argumenata:
+
+
+```c++
+class StripTest : public testing::TestWithParam<const char*>{ // fixture
+};
+
+
+TEST_P(StripTest, many){
+	const char * res = strip(GetParam());
+	auto N = std::strlen(res);
+	EXPECT_FALSE( std::isspace(static_cast<unsigned char>(res[0])) );
+	EXPECT_FALSE( std::isspace(static_cast<unsigned char>(res[N-1])) );
+}
+
+INSTANTIATE_TEST_SUITE_P(StripSkupUlaza,
+                         StripTest,
+                         testing::Values("  naprijed", "nazad    ", " oba "));
+```
+
+Izlaz:
+
+```
+1: [----------] 3 tests from StripSkupUlaza/StripTest
+1: [ RUN      ] StripSkupUlaza/StripTest.many/0
+1: [       OK ] StripSkupUlaza/StripTest.many/0 (0 ms)
+1: [ RUN      ] StripSkupUlaza/StripTest.many/1
+1: [       OK ] StripSkupUlaza/StripTest.many/1 (0 ms)
+1: [ RUN      ] StripSkupUlaza/StripTest.many/2
+1: [       OK ] StripSkupUlaza/StripTest.many/2 (0 ms)
+1: [----------] 3 tests from StripSkupUlaza/StripTest (0 ms total)
+```
+
+### Tipovi kao parametri
+
+Kada kod želimo testirati za različite tipove
+prvo definiramo _fixture klasu_ kao *predložak klase* i izvodimo ju iz `testing::Test` klase:
+
+
+```c++
+template <typename T>
+class MyTest : public testing::Test {
+ public:
+  // ...
+};
+```
+
+Tipove za koje želimo izvršiti testiranje zadajemo pomoću 
+[TYPED_TEST_SUITE()](https://google.github.io/googletest/reference/testing.html#TYPED_TEST_SUITE) makroa. Pri tome se niz tipova zadaje pomoću predloška `::testing::Types<>` koji uzima proizvojan
+broj parametara predloška.  Na primjer, ako želimo kod testirati na tipovima 
+`char`, `int` i  `unsigned int` koristimo sljedeću konstrukciju:
+
+
+```c++
+using MyTypes = ::testing::Types<char, int, unsigned int>;
+TYPED_TEST_SUITE(MyTest, MyTypes);
+```
+
+Sami testovi se pišu pomoću makroa `TYPED_TEST`:
+
+
+
+```c++
+TYPED_TEST(MyTest, ImeTesta){
+//...
+}
+```
+
+Test će biti ponovljen za svaku vrijednost parametra. Unutar testa trenutni parametar predloška za 
+koji je test generiran može se dohvatiti kroz *TypeParam* simbol.
+
+### Primjer
+
+Uzmimo da je naš vektor parametriziran i s tipom komponente te da dodijeljeni konstruktor
+vrši inicijalizaciju nulom.  U _fixture_ klasi 
+ćemo definirati jedan vektor `vec`:
+
+
+```c++
+template <typename T>
+class ParVectorTest : public ::testing::Test{
+public:
+    Vector<T, 3> vec;
+    ParVectorTest(){
+      for(std::size_t i=0; i<3; ++i) vec[i] = 0;
+    }
+};
+```
+
+Kao primjer testirat ćemo parametrizirani konstruktor kopije:
+
+
+```c++
+using MyTypes = ::testing::Types<int, float, double, long, char>;
+TYPED_TEST_SUITE(ParVectorTest, MyTypes);
+
+TYPED_TEST(ParVectorTest, equal){
+  Vector<TypeParam,4> vecd(this->vec);
+  EXPECT_EQ(vecd[0], this->vec[0]);
+  EXPECT_EQ(vecd[1], this->vec[1]);
+}
+```
+
+Izlaz:
+
+```
+1: [----------] 1 test from ParVectorTest/0, where TypeParam = int
+1: [ RUN      ] ParVectorTest/0.equal
+1: [       OK ] ParVectorTest/0.equal (0 ms)
+1: [----------] 1 test from ParVectorTest/0 (0 ms total)
+1: 
+1: [----------] 1 test from ParVectorTest/1, where TypeParam = float
+1: [ RUN      ] ParVectorTest/1.equal
+1: [       OK ] ParVectorTest/1.equal (0 ms)
+1: [----------] 1 test from ParVectorTest/1 (0 ms total)
+1: 
+1: [----------] 1 test from ParVectorTest/2, where TypeParam = double
+1: [ RUN      ] ParVectorTest/2.equal
+1: [       OK ] ParVectorTest/2.equal (0 ms)
+1: [----------] 1 test from ParVectorTest/2 (0 ms total)
+1: 
+1: [----------] 1 test from ParVectorTest/3, where TypeParam = long
+1: [ RUN      ] ParVectorTest/3.equal
+1: [       OK ] ParVectorTest/3.equal (0 ms)
+1: [----------] 1 test from ParVectorTest/3 (0 ms total)
+1: 
+1: [----------] 1 test from ParVectorTest/4, where TypeParam = char
+1: [ RUN      ] ParVectorTest/4.equal
+1: [       OK ] ParVectorTest/4.equal (0 ms)
+1: [----------] 1 test from ParVectorTest/4 (0 ms total)
+```
+
