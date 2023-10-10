@@ -52,6 +52,14 @@ class Vector : private std::array<double, N> {
                 (*this)[i] = neg_inf;
         }
 
+	template <std::size_t M>
+        Vector(Vector<M> const & other){
+            for(std::size_t i=0; i<N; ++i) (*this)[i] = 0;
+            auto K = std::min(M,N);
+            for(std::size_t i=0; i<K; ++i) (*this)[i] = other[i];
+
+	}
+
         double operator[](std::size_t n) const { 
             if(n >= N) 
                 throw BoundException{n};

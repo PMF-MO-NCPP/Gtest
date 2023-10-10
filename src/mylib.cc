@@ -25,7 +25,7 @@ long gcd(long a, long b)
 char * strip(const char * str){
     while(std::isspace(static_cast<unsigned char>(*str)))
         ++str;
-
+    // Ima grešku - stane kod prve bjeline. 
     const char * p=str;
     while(!std::isspace(static_cast<unsigned char>(*p)) && *p != '\0')
         ++p;
